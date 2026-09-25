@@ -1,0 +1,415 @@
+DynamoDB vs Spark vs Glue vs Redshift
+DynamoDB is not used because the data is "Big Data." It is used because the application needs very high-scale, low-latency reads/writes. The same operational data can later be copied/exported to S3 for Big Data analytics.
+Real-world example: Amazon-style e-commerce orders
+Imagine an e-commerce platform processing millions of orders per day.
+1. Customer places an order
+The application needs to immediately store and retrieve the order:
+Customer
+   │
+   ▼
+Order Service
+   │
+   ▼
+DynamoDB
+DynamoDB might contain:
+OrderId     CustomerId    Product    Amount    Status
+------------------------------------------------------
+ORD1001     C101          iPhone     ₹80,000   PLACED
+ORD1002     C102          TV         ₹50,000   SHIPPED
+ORD1003     C103          Laptop     ₹70,000   DELIVERED
+The application needs operations such as:
+Get order ORD1001
+Update ORD1001 → SHIPPED
+Get all orders for customer C101
+DynamoDB is designed for this kind of high-volume operational workload.
+
+2. Now imagine 3 years of orders
+You might have:
+DynamoDB
+    │
+    │ Export / Streams / ETL
+    ▼
+S3 Data Lake
+    │
+    │
+    ▼
+Glue / PySpark
+    │
+    │ Transform + aggregate
+    ▼
+Redshift
+    │
+    ▼
+BI / Data Analysts
+Now the questions become very different:
+"What were our monthly sales for the last 3 years?"
+"Which products have declining sales?"
+"Which customer segments generate the highest revenue?"
+"What is the average order value by state?"
+These aren't normal application queries. They're large-scale analytical queries.
+
+What PySpark might do
+Suppose S3 contains:
+s3://company-data/orders/
+    2024/
+    2025/
+    2026/
+You could have billions of historical orders.
+PySpark can process that data:
+S3
+│
+│ Billions of orders
+▼
+PySpark
+│
+├── remove bad records
+├── join customer data
+├── join product data
+├── calculate revenue
+├── aggregate by month/product/region
+└── produce analytical dataset
+        │
+        ▼
+     Redshift
+Redshift might then contain something like:
+monthly_sales
+
+Month       Region      Product       Revenue
+------------------------------------------------
+Jan-2026    Karnataka   Laptop        ₹12 Cr
+Jan-2026    Maharashtra TV             ₹8 Cr
+Feb-2026    Karnataka   Laptop        ₹15 Cr
+...
+Your BI tool can query this efficiently.
+
+But why not just keep everything in DynamoDB?
+Because DynamoDB and Redshift solve completely different problems.
+Imagine asking DynamoDB:
+"Calculate total revenue for every product across 3 billion orders."
+That's not what DynamoDB is optimized for.
+DynamoDB is optimized around known access patterns such as:
+Get order by OrderId
+Get customer's orders
+Update order status
+Redshift is optimized for:
+SELECT product, SUM(revenue)
+FROM orders
+GROUP BY product;
+
+One important correction: DynamoDB → S3 isn't necessarily the normal path
+There are several ways the data can get into S3.
+For example:
+                 ┌──> DynamoDB
+Application ─────┤
+                 └──> S3
+The application/event pipeline could write operational data to DynamoDB while also sending events/data toward S3.
+Or DynamoDB data can later be exported to S3 for analysis.
+Then:
+DynamoDB
+    │
+    ▼
+   S3
+    │
+    ▼
+Glue / PySpark
+    │
+    ▼
+Redshift
+So DynamoDB is not being used as the first stage of a Big Data pipeline because it's Big Data.
+It's there because:
+Application needs → DynamoDB
+Analytics needs → S3 / Spark / Redshift
+
+A very realistic architecture
+For an e-commerce company:
+                    CUSTOMER
+                       │
+                       ▼
+                 Order Service
+                       │
+                       ▼
+                  DynamoDB
+                (Operational)
+                       │
+                       │
+              Events / Export
+                       │
+                       ▼
+                 S3 Data Lake
+                       │
+              ┌────────┴────────┐
+              ▼                 ▼
+          Athena          Glue / PySpark
+       Ad-hoc queries           │
+                                ▼
+                           Redshift
+                                │
+                                ▼
+                         BI / Dashboards
+And this is the key distinction I'd remember for interviews:
+DynamoDB answers: "What is the order right now?" S3 + Spark answers: "What does our entire historical dataset tell us?" Redshift answers: "Give business users fast analytical answers from that data."
+
+EMR:
+EMR comes in where you need Spark/Hadoop processing at scale. The important thing is that Glue and EMR can overlap, so you don't necessarily use both.
+Using the same e-commerce example:
+                 E-commerce Application
+                          │
+                          ▼
+                     DynamoDB
+                   (operational)
+                          │
+                    Export/Events
+                          ▼
+                    S3 Data Lake
+                          │
+             ┌────────────┴────────────┐
+             │                         │
+             ▼                         ▼
+        Athena                    EMR + Spark
+    Ad-hoc SQL queries        Large-scale processing
+                                      │
+                                      ▼
+                                   S3 /
+                                  Redshift
+                                      │
+                                      ▼
+                                  BI/Analytics
+So what exactly does EMR do?
+Suppose you have 50 TB of historical orders in S3 and need to perform a complicated transformation:
+S3
+│
+│ 50 TB
+▼
+EMR + Spark
+│
+├── Clean data
+├── Join orders + customers + products
+├── Remove duplicates
+├── Calculate metrics
+├── Machine-learning preprocessing
+└── Aggregate billions of records
+│
+▼
+S3 / Redshift
+EMR provides the managed environment for running Spark/Hadoop.
+
+Then what's Glue?
+This is where it gets confusing.
+You could have:
+S3 → Glue → Redshift
+or:
+S3 → EMR/Spark → Redshift
+Both can perform Spark-based processing.
+A simplified distinction:
+
+So if your requirement is:
+"Every night, clean these files in S3, transform them and load them into Redshift."
+Glue is often a natural choice.
+If your requirement is:
+"We have a huge Spark workload with complex processing and need significant control over the Spark environment."
+EMR becomes more relevant.
+
+And where does DynamoDB fit?
+Now the complete mental model becomes:
+             OPERATIONAL WORLD
+                    │
+                    ▼
+               DynamoDB
+             Fast read/write
+                    │
+                    │
+                    ▼
+               S3 Data Lake
+             Historical data
+                    │
+        ┌───────────┴────────────┐
+        │                        │
+        ▼                        ▼
+     Athena                 Glue / EMR
+   SQL queries            Spark processing
+        │                        │
+        │                        ▼
+        │                   S3 / Redshift
+        │                        │
+        └──────────────┬─────────┘
+                       ▼
+                  Analytics / BI
+One very important point
+EMR isn't a database.
+It's a processing platform.
+Think:
+DynamoDB → store/read/write application data
+S3 → store massive amounts of data
+EMR + Spark → process massive amounts of data
+Redshift → analyze structured data in a warehouse
+Athena → SQL directly against S3
+A simple analogy:
+DynamoDB = shop's live order system S3 = giant historical warehouse EMR/Spark = thousands of workers processing the warehouse data Redshift = organized analytical warehouse Athena = someone walking into the warehouse and asking questions directly
+
+Hadoop vs Spark:
+. What is Apache Spark?
+Spark is a distributed processing engine.
+Suppose you have:
+
+10 TB of data
+
+Instead of one machine processing all 10 TB:
+
+             10 TB
+              │
+              ▼
+        ┌─────────────┐
+        │ One machine │  ← slow
+        └─────────────┘
+
+Spark can split the work across many machines:
+
+                    10 TB
+                      │
+          ┌───────────┼───────────┐
+          ▼           ▼           ▼
+       Worker 1    Worker 2    Worker 3
+        3.3 TB      3.3 TB      3.4 TB
+          │           │           │
+          └───────────┼───────────┘
+                      ▼
+                   Result
+
+That's the distributed part.
+Spark can do things like:
+Filter billions of records
+Join huge datasets
+Aggregate data
+Transform data
+Sort/group data
+Prepare data for ML
+
+2. What is PySpark?
+PySpark is simply Spark accessed through Python.
+Spark itself has APIs for several languages, including:
+
+Spark
+ ├── Scala
+ ├── Java
+ ├── Python → PySpark
+ └── R
+
+For example, with PySpark you can write Python-like code:
+
+df = spark.read.parquet("s3://orders/")
+
+result = (
+    df.filter(df.amount > 1000)
+      .groupBy("product")
+      .sum("amount")
+)
+
+You're writing Python, but Spark is doing the distributed processing underneath.
+So:
+Spark = engine PySpark = Python interface to that engine
+It's similar to:
+Java = language JDBC = Java interface to databases
+Not exactly the same relationship, but useful as a mental model.
+
+3. What is Hadoop?
+Hadoop came earlier and is a broader Big Data ecosystem.
+Historically, Hadoop provided several important components:
+
+Hadoop ecosystem
+│
+├── HDFS     → distributed file storage
+├── MapReduce → distributed processing
+├── YARN      → resource management
+└── ecosystem tools
+
+HDFS
+HDFS was designed to store huge datasets across many machines:
+
+              100 TB
+                │
+       ┌────────┼────────┐
+       ▼        ▼        ▼
+     Node 1   Node 2   Node 3
+      33TB      33TB     34TB
+
+MapReduce
+MapReduce was Hadoop's traditional distributed processing model.
+Spark later became popular because it can perform many workloads more efficiently and conveniently than traditional MapReduce.
+
+4. Spark vs Hadoop
+This is where people often get confused.
+Hadoop isn't simply "an alternative to Spark."
+Think of it like this:
+
+HADOOP
+┌──────────────────────────────┐
+│ HDFS       Storage            │
+│ YARN       Resource manager   │
+│ MapReduce  Processing         │
+│ Other ecosystem components    │
+└──────────────────────────────┘
+
+
+SPARK
+┌──────────────────────────────┐
+│ Distributed processing       │
+│ engine                       │
+└──────────────────────────────┘
+
+Spark can actually run on Hadoop infrastructure, particularly using YARN.
+But in AWS, you don't need to build Hadoop yourself.
+That's where EMR comes in.
+
+5. Where does EMR fit?
+Amazon EMR is AWS's managed platform for running Big Data frameworks such as Spark and Hadoop.
+So:
+
+                Amazon EMR
+                    │
+          ┌─────────┴─────────┐
+          ▼                   ▼
+       Spark                Hadoop
+          │
+          ▼
+       PySpark
+
+A common modern AWS architecture might therefore be:
+
+DynamoDB
+    │
+    ▼
+S3 Data Lake
+    │
+    ▼
+EMR
+    │
+    ▼
+PySpark
+    │
+    ▼
+Process TBs of data
+    │
+    ├──────> S3
+    │
+    └──────> Redshift
+
+The simplest way to remember all four
+
+And one more important distinction:
+S3 replaced much of the need for HDFS in modern AWS data-lake architectures.
+So you might see a modern architecture like:
+S3 → EMR + PySpark → Redshift
+without using HDFS at all.
+
+Missing part:
+No — no data is in Redshift yet. Nothing has actually run in AWS. Here's what's still missing before this flow works end-to-end:
+1. Infra not deployed — terraform apply hasn't been run (no real credentials configured here). Right now S3 bucket, EMR cluster, Redshift cluster, IAM roles are just plans, not real AWS resources.
+2. Raw data not in S3 — the CSVs in files/ are local only; you still need to upload them to the raw-zone prefixes (per files/README.md).
+3. No Redshift table DDL — src/redshift/ is still just a README placeholder. Spark's JDBC writer can auto-create the table, but there's no explicit schema/DDL defined yet — worth adding for clarity in a demo.
+4. Redshift JDBC driver missing — spark-submit needs --jars <redshift-jdbc-driver.jar> (or --packages) on the classpath; not wired up anywhere yet.
+5. PySpark isn't triggered by anything — the script exists, but nothing calls it. Options, none implemented yet:
+•
+Manual: aws emr add-steps / EMR console to submit it as a step.
+•
+Automated: EventBridge/Lambda or Step Functions to submit steps on a schedule.
+6. Networking — Redshift's security group/VPC needs to allow inbound JDBC (5439) from the EMR cluster; not configured in redshift.tf yet.

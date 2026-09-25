@@ -1,0 +1,6 @@
+customer_id,customer_name,region,segment
+C101,Aditi Sharma,North,Consumer
+C102,Rahul Verma,South,Consumer
+C103,Priya Nair,West,Corporate
+C104,Karan Mehta,East,Consumer
+C105,Sneha Iyer,South,Corporate
