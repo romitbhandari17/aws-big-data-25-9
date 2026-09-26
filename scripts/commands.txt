@@ -1,5 +1,12 @@
+### to download the redshift jdbc driver
 curl -sSL -o redshift-jdbc42-2.1.0.30.jar \
   "https://s3.amazonaws.com/redshift-downloads/drivers/jdbc/2.1.0.30/redshift-jdbc42-2.1.0.30.jar"
 
-aws s3 cp redshift-jdbc42-2.1.0.30.jar \
+####upload jar to s3 bucket
+aws s3 cp /Users/romitbhandari/IdeaProjects/aws-big-data-25-9/redshift-jdbc42-2.1.0.30.jar \
   s3://aws-big-data-25-9-data-lake/jars/redshift-jdbc42-2.1.0.30.jar
+
+### copy the files to s3 bucket
+  aws s3 cp files/customers.csv s3://aws-big-data-25-9-data-lake/raw/customers/customers.csv
+  aws s3 cp files/products.csv  s3://aws-big-data-25-9-data-lake/raw/products/products.csv
+  aws s3 cp files/orders.csv    s3://aws-big-data-25-9-data-lake/raw/orders/orders.csv
