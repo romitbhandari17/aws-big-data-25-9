@@ -32,3 +32,17 @@ variable "redshift_node_type" {
   description = "Instance/node type for the Redshift cluster (kept small for demo purposes)"
   type        = string
 }
+
+# --- Trigger (Lambda) related variables ---
+
+variable "redshift_jdbc_driver_s3_path" {
+  description = <<-EOT
+    S3 path to the Redshift JDBC driver jar, used by the Lambda-triggered
+    spark-submit step (e.g. s3://<bucket>/jars/redshift-jdbc42-2.1.0.30.jar).
+    The driver is proprietary and not committed to this repo - download it
+    from https://docs.aws.amazon.com/redshift/latest/mgmt/jdbc20-download-driver.html
+    and upload it to this path manually before the first run (see
+    src/spark/README.md).
+  EOT
+  type        = string
+}

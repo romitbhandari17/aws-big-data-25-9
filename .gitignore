@@ -12,6 +12,7 @@ override.tf.json
 *_override.tf.json
 .terraformrc
 terraform.rc
+**/modules/lambda/build/
 
 # JetBrains IDEs (IntelliJ/PyCharm/etc.)
 .idea/

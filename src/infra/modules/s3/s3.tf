@@ -31,7 +31,27 @@ resource "aws_s3_object" "curated_zone" {
   key    = "curated/"
 }
 
+# Uploads the PySpark job so EMR can spark-submit it directly from S3
+# (also re-uploaded automatically on every `terraform apply` after a code
+# change, via the source hash below).
+resource "aws_s3_object" "process_orders_script" {
+  bucket = aws_s3_bucket.data_lake.id
+  key    = "scripts/process_orders.py"
+  source = "${path.module}/../../../spark/jobs/process_orders.py"
+  etag   = filemd5("${path.module}/../../../spark/jobs/process_orders.py")
+}
+
 output "bucket_name" {
   description = "Name of the S3 data lake bucket"
   value       = aws_s3_bucket.data_lake.id
+}
+
+output "bucket_arn" {
+  description = "ARN of the S3 data lake bucket"
+  value       = aws_s3_bucket.data_lake.arn
+}
+
+output "spark_script_s3_path" {
+  description = "S3 path to the uploaded process_orders.py script"
+  value       = "s3://${aws_s3_bucket.data_lake.id}/${aws_s3_object.process_orders_script.key}"
 }

@@ -45,6 +45,9 @@ working end to end.
                       |
                       v
               S3 Data Lake (raw zone)
+                      |  (new file under raw/orders/ triggers)
+                      v
+              Lambda (S3 event -> emr add-steps)
                       |
                       v
           AWS EMR + PySpark (processing)
@@ -54,7 +57,7 @@ working end to end.
               S3 Data Lake (curated zone)
                       |
                       v
-             Amazon Redshift (COPY / load)
+             Amazon Redshift (JDBC load)
                       |
                       v
             Analytical / BI queries
@@ -157,6 +160,8 @@ folder — no mixing of unrelated logic in a single place:
 ```
 src/
   spark/              PySpark job scripts run on EMR (Phase 1 processing)
+  lambda/
+    emr.py            Lambda handler: S3 event -> submits the EMR spark-submit step
   redshift/           Redshift SQL: table DDL + load (COPY) scripts
   sqs/                Optional/example only - see note below
   infra/
@@ -173,11 +178,14 @@ src/
         redshift.tf   Redshift cluster
         iam.tf        IAM for Redshift
       spark/
-        emr.tf        EMR cluster running the PySpark jobs
-        iam.tf        IAM for EMR
+        emr.tf         EMR cluster running the PySpark jobs
+        iam.tf         IAM for EMR
+      lambda/
+        lambda.tf      S3-event-triggered Lambda that submits the EMR step
+        iam.tf         IAM for the Lambda's EMR permissions
       sqs/
-        sqs.tf        Optional queue (see note below)
-        iam.tf        IAM for SQS
+        sqs.tf         Optional queue (see note below)
+        iam.tf         IAM for SQS
 ```
 
 Rules followed for this structure:
@@ -203,7 +211,8 @@ demo's scale, EMR jobs can be triggered directly without a queue. The
 `src/sqs` and `infra/modules/sqs` folders are kept only as an optional/
 example scaffold and are **not** part of the required Phase 1 services.
 
-**Phase 1 required services: S3, EMR (PySpark), Redshift, and IAM only.**
+**Phase 1 required services: S3, EMR (PySpark), Redshift, Lambda (S3-event
+trigger), and IAM only.**
 
 ## 8. Out of Scope for Now
 

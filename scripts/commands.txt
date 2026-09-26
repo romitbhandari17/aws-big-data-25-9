@@ -1,0 +1,5 @@
+curl -sSL -o redshift-jdbc42-2.1.0.30.jar \
+  "https://s3.amazonaws.com/redshift-downloads/drivers/jdbc/2.1.0.30/redshift-jdbc42-2.1.0.30.jar"
+
+aws s3 cp redshift-jdbc42-2.1.0.30.jar \
+  s3://aws-big-data-25-9-data-lake/jars/redshift-jdbc42-2.1.0.30.jar

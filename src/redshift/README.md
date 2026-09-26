@@ -1,7 +1,17 @@
 # src/redshift
 
-SQL scripts for Amazon Redshift: table DDL for curated orders/customers/
-products data, and load (COPY) scripts that pull curated Parquet files from
-the S3 curated zone into Redshift for analytical querying.
+SQL scripts for Amazon Redshift.
 
-No code yet — scripts will be added here in the implementation phase.
+## ddl.sql
+
+Explicit table DDL for the curated `orders_summary` table that
+`src/spark/jobs/process_orders.py` loads into Redshift. Spark's JDBC
+writer can auto-create this table on first write, but running this DDL
+up front makes the schema/types/keys clear for the demo:
+
+```
+psql -h <redshift-endpoint> -p 5439 -U admin -d orders_analytics -f ddl.sql
+```
+
+Get `<redshift-endpoint>` from the Terraform output `redshift.cluster_endpoint`
+(or `redshift.jdbc_url` for the full JDBC connection string).
